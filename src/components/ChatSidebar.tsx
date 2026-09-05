@@ -155,7 +155,10 @@ export default function ChatSidebar({
             </div>
 
             <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => {
+                localStorage.removeItem('chatbot_ai_logged_in');
+                signOut({ callbackUrl: '/login' });
+              }}
               className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
               title="Sign Out"
             >

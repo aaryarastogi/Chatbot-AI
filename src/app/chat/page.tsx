@@ -19,7 +19,7 @@ export default function ChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash-lite');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -28,9 +28,10 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Authentication Guard
+  // Authentication Guard: Check session or persistent local login state
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    const isLocallyLoggedIn = localStorage.getItem('chatbot_ai_logged_in');
+    if (status === 'unauthenticated' && !isLocallyLoggedIn) {
       router.push('/login');
     }
   }, [status, router]);
@@ -265,12 +266,19 @@ export default function ChatPage() {
     }
   };
 
-  if (status === 'loading') {
+  const isClientLoggedIn = typeof window !== 'undefined' && Boolean(localStorage.getItem('chatbot_ai_logged_in'));
+
+  if (status === 'loading' && !isClientLoggedIn) {
     return (
-      <div className="min-h-screen bg-[#080c17] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
+      <div
+        className="min-h-screen bg-[#080c17] text-slate-100 flex items-center justify-center"
+        style={{ backgroundColor: '#080c17', color: '#f1f5f9', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
           <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-          <p className="text-xs text-slate-400 font-medium">Authenticating Session...</p>
+          <p className="text-xs text-slate-400 font-medium" style={{ color: '#94a3b8' }}>
+            Authenticating Session...
+          </p>
         </div>
       </div>
     );

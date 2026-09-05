@@ -32,6 +32,7 @@ export default function LoginPage() {
       if (res?.error) {
         setError('Invalid credentials. Please try again.');
       } else {
+        localStorage.setItem('chatbot_ai_logged_in', 'true');
         router.push('/chat');
       }
     } catch (err) {
@@ -42,6 +43,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
+    localStorage.setItem('chatbot_ai_logged_in', 'true');
     signIn('google', { callbackUrl: '/chat' });
   };
 

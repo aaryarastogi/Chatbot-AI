@@ -5,7 +5,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { messages, apiKey: userApiKey, modelName = 'gemini-3.6-flash' } = body;
+    const { messages, apiKey: userApiKey, modelName = 'gemini-3.5-flash-lite' } = body;
 
     // Collect candidate API keys to try (user custom key first, then environment variable)
     const apiKeysToTry = [userApiKey, process.env.GEMINI_API_KEY].filter(
@@ -40,15 +40,14 @@ export async function POST(req: Request) {
     // Strip '-latest' suffix if provided
     const cleanModelName = (modelName || '').replace(/-latest$/, '');
 
-    // List of valid candidate models in order of preference
+    // List of valid candidate models in order of preference (Fastest first)
     const candidateModels = [
       cleanModelName,
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.6-flash',
       'gemini-3.1-flash-lite',
       'gemini-flash-latest',
-      'gemini-2.5-flash',
     ].filter((m, index, self) => Boolean(m) && self.indexOf(m) === index);
 
     const sanitizedMessages = (messages || [])
@@ -105,6 +104,17 @@ export async function POST(req: Request) {
         } catch (err: any) {
           lastError = err;
           console.warn(`Key/Model candidate failed (${targetModel}):`, err?.message);
+
+          // Fast Fail: If key is unauthorized (401), no need to loop through remaining models with the same key
+          const isAuthErr =
+            err?.message?.includes('401') ||
+            err?.message?.includes('Unauthorized') ||
+            err?.message?.includes('UNAUTHENTICATED') ||
+            err?.message?.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED');
+
+          if (isAuthErr) {
+            break; // Skip to next keyCandidate immediately
+          }
         }
       }
     }

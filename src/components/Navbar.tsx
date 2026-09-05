@@ -45,9 +45,8 @@ export default function Navbar({
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium text-xs pr-1"
           >
-            <option value="gemini-3.6-flash" className="bg-slate-900 text-slate-200">Gemini 3.6 Flash (Recommended)</option>
-            <option value="gemini-3.5-flash" className="bg-slate-900 text-slate-200">Gemini 3.5 Flash</option>
-            <option value="gemini-3.5-flash-lite" className="bg-slate-900 text-slate-200">Gemini 3.5 Flash Lite (Fastest)</option>
+            <option value="gemini-3.5-flash-lite" className="bg-slate-900 text-slate-200">Gemini 3.5 Flash Lite (Ultra Fast ⚡)</option>
+            <option value="gemini-3.6-flash" className="bg-slate-900 text-slate-200">Gemini 3.6 Flash (Thinking / Complex Code)</option>
           </select>
         </div>
 
