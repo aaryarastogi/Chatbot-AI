@@ -19,7 +19,7 @@ export default function ChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -108,6 +108,12 @@ export default function ChatPage() {
     setIsSettingsOpen(false);
   };
 
+  const handleClearApiKey = () => {
+    localStorage.removeItem('chatbot_ai_api_key');
+    setApiKey('');
+    setIsSettingsOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -177,10 +183,12 @@ export default function ChatPage() {
       abortControllerRef.current = new AbortController();
 
       const activeSessionObj = updatedSessionsWithUser.find((s) => s.id === currentSessionId);
-      const apiMessages = (activeSessionObj?.messages || []).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const apiMessages = (activeSessionObj?.messages || [])
+        .filter((m) => m && m.content && m.content.trim() !== '')
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -356,7 +364,7 @@ export default function ChatPage() {
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
+                  placeholder="Enter your Gemini API key..."
                   className="w-full py-2.5 px-3.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm font-mono"
                 />
                 <p className="text-[11px] text-slate-500 mt-1.5">
@@ -372,20 +380,29 @@ export default function ChatPage() {
                 </p>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-between items-center pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+                  onClick={handleClearApiKey}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 border border-rose-500/20"
                 >
-                  Cancel
+                  Clear Stored Key
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
-                >
-                  Save API Key
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
+                  >
+                    Save API Key
+                  </button>
+                </div>
               </div>
             </form>
           </div>

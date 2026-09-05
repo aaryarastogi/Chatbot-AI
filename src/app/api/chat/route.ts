@@ -1,17 +1,25 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText } from 'ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
-    const { messages, apiKey: userApiKey, modelName = 'gemini-1.5-flash' } = await req.json();
+    const body = await req.json();
+    const { messages, apiKey: userApiKey, modelName = 'gemini-3.6-flash' } = body;
 
-    const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+    // Collect candidate API keys to try (user custom key first, then environment variable)
+    const apiKeysToTry = [userApiKey, process.env.GEMINI_API_KEY].filter(
+      (k, index, self) =>
+        Boolean(k) &&
+        typeof k === 'string' &&
+        k.trim().length > 5 &&
+        self.indexOf(k) === index
+    );
 
-    if (!apiKey || apiKey.trim() === '') {
-      const fallbackText = "Hello! 👋 I am your Next.js AI Assistant.\n\nTo enable live responses from Google Gemini:\n1. Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey).\n2. Click the **API Key** button in the top right corner of this app and paste your key!";
-      
+    if (apiKeysToTry.length === 0) {
+      const fallbackText =
+        "Hello! 👋 I am your Next.js AI Assistant.\n\nTo enable live responses from Google Gemini:\n1. Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey) (your key will start with `AIzaSy...`).\n2. Click the **API Key** button in the top right corner of this app and paste your key!";
+
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
@@ -29,25 +37,148 @@ export async function POST(req: Request) {
       });
     }
 
-    // Initialize Google Gemini provider with API Key
-    const google = createGoogleGenerativeAI({ apiKey });
+    // Strip '-latest' suffix if provided
+    const cleanModelName = (modelName || '').replace(/-latest$/, '');
 
-    // Stream text response using Vercel AI SDK
-    const result = streamText({
-      model: google(modelName),
-      system: 'You are an intelligent, helpful, and concise AI coding and general knowledge assistant. Format your answers clearly using Markdown, and wrap code in appropriate markdown code blocks.',
-      messages,
+    // List of valid candidate models in order of preference
+    const candidateModels = [
+      cleanModelName,
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+    ].filter((m, index, self) => Boolean(m) && self.indexOf(m) === index);
+
+    const sanitizedMessages = (messages || [])
+      .filter((m: any) => m && m.content && String(m.content).trim() !== '')
+      .map((m: any) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: String(m.content).trim() }],
+      }));
+
+    if (sanitizedMessages.length === 0) {
+      return new Response('Please enter a message to begin.', {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    const lastUserMessage = sanitizedMessages.pop();
+    const promptText = lastUserMessage?.parts[0]?.text || 'Hello';
+
+    let streamIterator: any = null;
+    let firstChunkText = '';
+    let lastError: any = null;
+
+    // Try available keys and candidate models
+    keyLoop: for (const keyCandidate of apiKeysToTry) {
+      const genAI = new GoogleGenerativeAI(keyCandidate);
+
+      for (const targetModel of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: targetModel,
+            systemInstruction: {
+              role: 'system',
+              parts: [
+                {
+                  text: 'You are an intelligent, helpful, and concise AI coding and general knowledge assistant. Format your answers clearly using Markdown, and wrap code in appropriate markdown code blocks.',
+                },
+              ],
+            },
+          });
+
+          const chat = model.startChat({
+            history: sanitizedMessages.length > 0 ? sanitizedMessages : undefined,
+          });
+
+          const streamResult = await chat.sendMessageStream(promptText);
+          const iterator = streamResult.stream[Symbol.asyncIterator]();
+          const firstChunk = await iterator.next();
+
+          if (!firstChunk.done && firstChunk.value) {
+            firstChunkText = firstChunk.value.text() || '';
+            streamIterator = iterator;
+            break keyLoop; // Successfully got response!
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Key/Model candidate failed (${targetModel}):`, err?.message);
+        }
+      }
+    }
+
+    const encoder = new TextEncoder();
+
+    if (!streamIterator && !firstChunkText) {
+      const errorMsg = lastError?.message || 'All Gemini model candidates failed to respond.';
+      const isAuthError =
+        errorMsg.includes('401') ||
+        errorMsg.includes('Unauthorized') ||
+        errorMsg.includes('UNAUTHENTICATED') ||
+        errorMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+        errorMsg.includes('authentication');
+
+      let fallbackErrorText = `⚠️ **API Error**: ${errorMsg}\n\nPlease check that your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) is valid and active.`;
+
+      if (isAuthError) {
+        fallbackErrorText = `⚠️ **Invalid API Key (401 Unauthorized)**:\n\nThe API key provided is not a valid Google AI Studio Gemini key.\n\n👉 **How to fix this:**\n1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)\n2. Click **Create API key** (Valid keys start with \`AIzaSy...\`)\n3. Click the **API Key** button at top-right in this app and paste your new key!`;
+      }
+
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(fallbackErrorText));
+          controller.close();
+        },
+      });
+
+      return new Response(errorStream, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    // Stream remaining content directly to client
+    const customStream = new ReadableStream({
+      async start(controller) {
+        try {
+          if (firstChunkText) {
+            controller.enqueue(encoder.encode(firstChunkText));
+          }
+          while (true) {
+            const { done, value } = await streamIterator.next();
+            if (done) break;
+            const chunkText = value.text();
+            if (chunkText) {
+              controller.enqueue(encoder.encode(chunkText));
+            }
+          }
+          controller.close();
+        } catch (err: any) {
+          console.error('Error during stream iteration:', err);
+          controller.enqueue(
+            encoder.encode(
+              `\n\n⚠️ **Stream Error**: ${err?.message || 'Streaming failed. Please verify your Gemini API key.'}`
+            )
+          );
+          controller.close();
+        }
+      },
     });
 
-    // toTextStreamResponse streams raw text without AI SDK protocol prefixes (like 0: or 3:)
-    return result.toTextStreamResponse();
+    return new Response(customStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      },
+    });
   } catch (error: any) {
     console.error('Error in /api/chat route:', error);
     const errorMessage = error?.message || 'Failed to connect to Google Gemini API.';
     return new Response(
-      `⚠️ **API Error**: ${errorMessage}\n\nPlease check if your Gemini API key is valid and has active quota.`,
+      `⚠️ **API Error**: ${errorMessage}\n\nPlease verify that your API key from [Google AI Studio](https://aistudio.google.com/app/apikey) is valid and active.`,
       {
-        status: 200, // Return 200 so stream reader displays clean error message
+        status: 200,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       }
     );

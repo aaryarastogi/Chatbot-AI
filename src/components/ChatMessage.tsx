@@ -75,7 +75,7 @@ export default function ChatMessage({ message, userImage, userName }: ChatMessag
           <p className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm md:text-base">
             {message.content}
           </p>
-        ) : (
+        ) : message.content ? (
           <div className="prose prose-invert max-w-none text-slate-200 text-sm md:text-base leading-relaxed">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -121,6 +121,11 @@ export default function ChatMessage({ message, userImage, userName }: ChatMessag
             >
               {message.content}
             </ReactMarkdown>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 text-indigo-400 text-xs py-1">
+            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            <span className="font-medium text-slate-400 animate-pulse">Gemini is thinking...</span>
           </div>
         )}
       </div>
