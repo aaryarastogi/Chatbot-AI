@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Sparkles, ArrowRight, Lock, Mail, ShieldCheck, Zap } from 'lucide-react';
 
 export default function LoginPage() {
@@ -30,7 +31,7 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        setError('Invalid credentials. Please try again.');
+        setError('Invalid email or password. Please try again or create a new account.');
       } else {
         localStorage.setItem('chatbot_ai_logged_in', 'true');
         router.push('/chat');
@@ -56,7 +57,10 @@ export default function LoginPage() {
     <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#080c17] overflow-hidden">
       {/* Background Neon Glowing Orbs */}
       <div className="ai-glow top-1/4 left-1/4 w-96 h-96 bg-indigo-600/30 animate-glow" />
-      <div className="ai-glow bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/20 animate-glow" style={{ animationDelay: '4s' }} />
+      <div
+        className="ai-glow bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/20 animate-glow"
+        style={{ animationDelay: '4s' }}
+      />
 
       <div className="w-full max-w-md relative z-10">
         {/* Header Branding */}
@@ -181,6 +185,14 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Link to Signup */}
+          <div className="mt-6 text-center text-xs text-slate-400">
+            Don&apos;t have an account?{' '}
+            <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
+              Create an Account / Sign Up
+            </Link>
+          </div>
         </div>
       </div>
     </div>

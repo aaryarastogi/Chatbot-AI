@@ -1,6 +1,9 @@
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
+import { connectToDatabase } from './mongodb';
+import User from '@/models/User';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -10,7 +13,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'demo_google_client_secret',
     }),
 
-    // 2. Email / Credentials Provider (For custom login form)
+    // 2. Email / Credentials Provider (MongoDB Atlas Authentication)
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -22,14 +25,38 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Demo Authentication Logic (Can be connected to Prisma / MongoDB / PostgreSQL)
-        // Accepts demo account or any valid email input for testing ease
-        return {
-          id: 'user_1',
-          name: credentials.email.split('@')[0] || 'Demo User',
-          email: credentials.email,
-          image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${credentials.email}`,
-        };
+        try {
+          await connectToDatabase();
+
+          const normalizedEmail = credentials.email.toLowerCase().trim();
+          const user = await User.findOne({ email: normalizedEmail });
+
+          if (!user) {
+            return null;
+          }
+
+          // Check if stored password is a bcrypt hash or fallback plain string
+          let isPasswordValid = false;
+          if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
+            isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          } else {
+            isPasswordValid = user.password === credentials.password;
+          }
+
+          if (!isPasswordValid) {
+            return null;
+          }
+
+          return {
+            id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            image: user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`,
+          };
+        } catch (err) {
+          console.error('Error authorizing user with MongoDB:', err);
+          return null;
+        }
       },
     }),
   ],
