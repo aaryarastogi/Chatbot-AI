@@ -308,7 +308,8 @@ export default function ChatPage() {
       });
 
       if (!res.ok) {
-        throw new Error('API Request Failed');
+        const errorText = await res.text().catch(() => '');
+        throw new Error(errorText || `API Request Failed with status ${res.status}`);
       }
 
       if (!res.body) throw new Error('No response stream available');
@@ -347,6 +348,11 @@ export default function ChatPage() {
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('Streaming error:', err);
+        const rawErrMsg = err?.message || 'Unable to connect to AI server.';
+        const formattedErr = rawErrMsg.startsWith('⚠️')
+          ? rawErrMsg
+          : `⚠️ **Error**: ${rawErrMsg}`;
+
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -354,8 +360,7 @@ export default function ChatPage() {
                 m.id === assistantMsgId
                   ? {
                       ...m,
-                      content:
-                        '⚠️ Error: Unable to fetch response. Please check your network connection.',
+                      content: formattedErr,
                     }
                   : m
               );
