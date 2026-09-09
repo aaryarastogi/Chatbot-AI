@@ -20,11 +20,11 @@ if (!global.mongooseCache) {
   global.mongooseCache = cached;
 }
 
+const DEFAULT_MONGODB_URI =
+  'mongodb+srv://aaryarastogi0110_db_user:rR3xASJQLFVnU6L5@cluster0.xqowyei.mongodb.net/chatbot_ai?retryWrites=true&w=majority';
+
 export async function connectToDatabase(): Promise<typeof mongoose> {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable in your deployment environment variables.');
-  }
+  const MONGODB_URI = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
 
   if (cached.conn) {
     return cached.conn;
