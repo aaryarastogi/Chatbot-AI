@@ -51,7 +51,6 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash');
-  const [apiKey, setApiKey] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -59,7 +58,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Initialize theme & API key from localStorage
+  // Initialize theme from localStorage
   useEffect(() => {
     const savedTheme = (localStorage.getItem('chatbot_ai_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
@@ -70,19 +69,7 @@ export default function ChatPage() {
       document.documentElement.classList.remove('light');
       document.documentElement.classList.add('dark');
     }
-
-    const savedKey = localStorage.getItem('chatbot_ai_api_key') || '';
-    setApiKey(savedKey);
   }, []);
-
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    if (key) {
-      localStorage.setItem('chatbot_ai_api_key', key);
-    } else {
-      localStorage.removeItem('chatbot_ai_api_key');
-    }
-  };
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -316,7 +303,6 @@ export default function ChatPage() {
         body: JSON.stringify({
           messages: apiMessages,
           modelName: selectedModel,
-          apiKey: apiKey || undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -438,8 +424,6 @@ export default function ChatPage() {
           setSelectedModel={setSelectedModel}
           theme={theme}
           onToggleTheme={toggleTheme}
-          apiKey={apiKey}
-          onSaveApiKey={handleSaveApiKey}
         />
 
         {/* Chat Feed */}
