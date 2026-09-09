@@ -5,7 +5,7 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { messages, apiKey: userApiKey, modelName = 'gemini-3.5-flash-lite' } = body;
+    const { messages, apiKey: userApiKey, modelName = 'gemini-3.5-flash' } = body;
 
     // Collect candidate API keys to try (user custom key first, then environment variable)
     const apiKeysToTry = [userApiKey, process.env.GEMINI_API_KEY].filter(
@@ -40,13 +40,12 @@ export async function POST(req: Request) {
     // Strip '-latest' suffix if provided
     const cleanModelName = (modelName || '').replace(/-latest$/, '');
 
-    // List of valid candidate models in order of preference (Fastest first)
+    // List of valid candidate models in order of preference (Fastest / working models first)
     const candidateModels = [
       cleanModelName,
-      'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
       'gemini-3.6-flash',
-      'gemini-3.1-flash-lite',
       'gemini-flash-latest',
     ].filter((m, index, self) => Boolean(m) && self.indexOf(m) === index);
 
@@ -105,12 +104,15 @@ export async function POST(req: Request) {
           lastError = err;
           console.warn(`Key/Model candidate failed (${targetModel}):`, err?.message);
 
-          // Fast Fail: If key is unauthorized (401), no need to loop through remaining models with the same key
+          // Fast Fail: If key is unauthorized/invalid, no need to loop through remaining models with the same key
           const isAuthErr =
             err?.message?.includes('401') ||
             err?.message?.includes('Unauthorized') ||
             err?.message?.includes('UNAUTHENTICATED') ||
-            err?.message?.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED');
+            err?.message?.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+            err?.message?.includes('API key not valid') ||
+            err?.message?.includes('API_KEY_INVALID') ||
+            err?.message?.includes('fetch failed');
 
           if (isAuthErr) {
             break; // Skip to next keyCandidate immediately
@@ -128,12 +130,14 @@ export async function POST(req: Request) {
         errorMsg.includes('Unauthorized') ||
         errorMsg.includes('UNAUTHENTICATED') ||
         errorMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
-        errorMsg.includes('authentication');
+        errorMsg.includes('API key not valid') ||
+        errorMsg.includes('API_KEY_INVALID') ||
+        errorMsg.includes('fetch failed');
 
-      let fallbackErrorText = `⚠️ **API Error**: ${errorMsg}\n\nPlease check that your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) is valid and active.`;
+      let fallbackErrorText = `⚠️ **API Error**: ${errorMsg}\n\nPlease check that your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) is valid and active.\n\n👉 Click the **Key 🔑** button in the top right navbar to paste a valid Gemini API key (starts with \`AIzaSy...\`).`;
 
       if (isAuthError) {
-        fallbackErrorText = `⚠️ **Invalid API Key (401 Unauthorized)**:\n\nThe API key provided is not a valid Google AI Studio Gemini key.\n\n👉 **How to fix this:**\n1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)\n2. Click **Create API key** (Valid keys start with \`AIzaSy...\`)\n3. Click the **API Key** button at top-right in this app and paste your new key!`;
+        fallbackErrorText = `⚠️ **Invalid or Missing Gemini API Key**:\n\nThe current API key is invalid or unauthorized by Google Generative AI.\n\n👉 **How to fix this:**\n1. Get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey) (Valid keys start with \`AIzaSy...\`)\n2. Click the **Key 🔑** button in the top right corner of this app and paste your key!`;
       }
 
       const errorStream = new ReadableStream({
