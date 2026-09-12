@@ -4,7 +4,9 @@ frontend:
     preBuild:
       commands:
         - npm ci
-        - env | grep -E 'GOOGLE_|NEXTAUTH_|MONGODB_|GEMINI_|CHAT_' >> .env.production
+        - env | grep -E 'GOOGLE_|NEXTAUTH_|MONGODB_|GEMINI_|CHAT_' >> .env.production || true
+        - echo "=== Exported Environment Variable Keys ==="
+        - cut -d= -f1 .env.production || true
     build:
       commands:
         - npm run build
