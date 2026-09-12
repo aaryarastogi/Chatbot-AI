@@ -5,6 +5,10 @@ import bcrypt from 'bcryptjs';
 import { connectToDatabase } from './mongodb';
 import User from '@/models/User';
 
+if (process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL.replace(/\/login\/?$/i, '').replace(/\/+$/, '');
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     // 1. Google OAuth Provider
@@ -67,6 +71,13 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch (e) {}
+      return `${baseUrl}/chat`;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
