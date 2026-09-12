@@ -9,8 +9,8 @@ export const authOptions: NextAuthOptions = {
   providers: [
     // 1. Google OAuth Provider
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || 'demo_google_client_id',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'demo_google_client_secret',
+      clientId: (process.env.GOOGLE_CLIENT_ID || '').trim(),
+      clientSecret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
     }),
 
     // 2. Email / Credentials Provider (MongoDB Atlas Authentication)
